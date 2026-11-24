@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+backend/test.db
+
+# Node
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Env / secrets — never commit these
+.env
+.env.*
+!.env.example
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+# NOTE: .terraform.lock.hcl SHOULD be committed (pins provider versions)
+
+.DS_Store

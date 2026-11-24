@@ -1,0 +1,65 @@
+# Reusable workflow: deploy one image tag to one environment, then smoke-test it.
+name: _deploy-env
+
+on:
+  workflow_call:
+    inputs:
+      github_environment:
+        type: string
+        required: true
+      tf_environment:
+        type: string
+        required: true
+      image_tag:
+        type: string
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.github_environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.github_environment }}
+      url: ${{ steps.smoke.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Migrate DB + roll ECS services
+        env:
+          PROJECT: ${{ vars.PROJECT }}
+          ENVIRONMENT: ${{ inputs.tf_environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+        run: ./scripts/deploy.sh
+
+      - name: Smoke test
+        id: smoke
+        env:
+          APP_URL: ${{ vars.APP_URL }} # optional per-environment variable (custom domain)
+        run: |
+          if [ -z "$APP_URL" ]; then
+            DNS=$(aws elbv2 describe-load-balancers --names "${{ vars.PROJECT }}-${{ inputs.tf_environment }}" \
+                  --query 'LoadBalancers[0].DNSName' --output text)
+            APP_URL="http://${DNS}"
+          fi
+          echo "url=${APP_URL}" >> "$GITHUB_OUTPUT"
+
+          echo "Checking ${APP_URL}"
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "${APP_URL}/api/health/ready"
+          echo
+          VERSION=$(curl -fsS "${APP_URL}/api/health" | jq -r .version)
+          if [ "$VERSION" != "${{ inputs.image_tag }}" ]; then
+            echo "❌ Expected version ${{ inputs.image_tag }} but got ${VERSION}"
+            exit 1
+          fi
+          curl -fsS -o /dev/null "${APP_URL}/"
+          echo "✅ ${{ inputs.github_environment }} is serving ${VERSION}"

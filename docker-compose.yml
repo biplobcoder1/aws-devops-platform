@@ -1,0 +1,61 @@
+# Local development stack that mirrors the AWS production layout:
+#   proxy (=ALB)  ->  frontend (=ECS service)  +  backend (=ECS service)  ->  db (=RDS)
+# Run:  docker compose up --build     then open http://localhost:8080
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: taskflow
+      POSTGRES_USER: taskflow
+      POSTGRES_PASSWORD: taskflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-off job, exactly like the ECS "migrate" task the pipeline runs before each deploy
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &backend_env
+      ENVIRONMENT: local
+      APP_VERSION: local-dev
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: taskflow
+      DB_USER: taskflow
+      DB_PASSWORD: taskflow
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    environment: *backend_env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+
+  proxy:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  pgdata:
