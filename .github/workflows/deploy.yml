@@ -34,7 +34,7 @@ jobs:
       - id: tag
         run: echo "tag=${{ inputs.image_tag || github.sha }}" >> "$GITHUB_OUTPUT"
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
