@@ -40,6 +40,15 @@ locals {
   account_id   = data.aws_caller_identity.current.account_id
   state_bucket = "${var.project}-tfstate-${local.account_id}"
   repo         = "${var.github_owner}/${var.github_repo}"
+
+  # GitHub's OIDC "sub" claim starts with "repo:<owner>/<repo>" by default, or
+  # "repo:<owner>@<owner_id>/<repo>@<repo_id>" when the repo uses immutable subjects.
+  # Check yours: gh api repos/OWNER/REPO/actions/oidc/customization/sub
+  sub_prefix = (
+    var.github_owner_id != null && var.github_repo_id != null
+    ? "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
+    : "repo:${local.repo}"
+  )
 }
 
 # --------------------------------------------------------------------------
@@ -124,9 +133,9 @@ resource "aws_iam_openid_connect_provider" "github" {
 # optionally only from specific branches / GitHub environments.
 data "aws_iam_policy_document" "trust" {
   for_each = {
-    plan   = ["repo:${local.repo}:pull_request", "repo:${local.repo}:ref:refs/heads/main"]
-    apply  = ["repo:${local.repo}:environment:staging", "repo:${local.repo}:environment:production"]
-    deploy = ["repo:${local.repo}:environment:staging", "repo:${local.repo}:environment:production", "repo:${local.repo}:ref:refs/heads/main"]
+    plan   = ["${local.sub_prefix}:pull_request", "${local.sub_prefix}:ref:refs/heads/main"]
+    apply  = ["${local.sub_prefix}:environment:staging", "${local.sub_prefix}:environment:production"]
+    deploy = ["${local.sub_prefix}:environment:staging", "${local.sub_prefix}:environment:production", "${local.sub_prefix}:ref:refs/heads/main"]
   }
 
   statement {

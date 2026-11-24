@@ -19,3 +19,15 @@ variable "github_repo" {
   description = "GitHub repository name, e.g. aws-devops-platform"
   type        = string
 }
+
+variable "github_owner_id" {
+  description = "Numeric GitHub owner ID. Set it (with github_repo_id) when the repo uses immutable OIDC subjects."
+  type        = string
+  default     = null
+}
+
+variable "github_repo_id" {
+  description = "Numeric GitHub repository ID. Set it (with github_owner_id) when the repo uses immutable OIDC subjects."
+  type        = string
+  default     = null
+}

@@ -3,3 +3,6 @@ project      = "taskflow"
 aws_region   = "us-west-2"
 github_owner = "mkmahmud"
 github_repo  = "aws-devops-platform"
+# Only if `gh api repos/OWNER/REPO/actions/oidc/customization/sub` shows use_immutable_subject: true
+# github_owner_id = "123456"
+# github_repo_id  = "987654321"
